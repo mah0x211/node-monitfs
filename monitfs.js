@@ -153,7 +153,32 @@ function monitfs()
                     unregister( self.entry );
                 }
                 else if( self.stat.isFile ){
+                    update( self.entry, self.path );
+                }
+                else {
                     readDir( self.path );
+                }
+            });
+        },
+        update = function( entry, path )
+        {
+            fs.stat( path, function( err, stat )
+            {
+                if( err ){
+                    unregister( entry );
+                    NOTIFY( 'error', err );
+                }
+                else
+                {
+                    unregister( entry, true );
+                    register( entry, path, {
+                        isFile: stat.isFile(),
+                        mode: stat.mode,
+                        size: stat.size,
+                        atime: stat.atime,
+                        mtime: stat.mtime,
+                        ctime: stat.ctime
+                    });
                 }
             });
         },
@@ -168,7 +193,7 @@ function monitfs()
                 NOTIFY( 'watch', entry, path, stat );
             }
         },
-        unregister = function( entry )
+        unregister = function( entry, silently )
         {
             if( entry && MONITOR[entry] )
             {
@@ -176,7 +201,9 @@ function monitfs()
                 
                 delete MONITOR[entry];
                 target.close();
-                NOTIFY( 'unwatch', entry, target.path, target.stat );
+                if( !silently ){
+                    NOTIFY( 'unwatch', entry, target.path, target.stat );
+                }
                 
                 if( !target.stat.isFile ){
                     getEntries( entry ).forEach( unregister );
