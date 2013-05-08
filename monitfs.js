@@ -89,7 +89,14 @@ function traverse( root, cb )
                 {
                     result.push({
                         path: path,
-                        isFile: isFile
+                        stat: {
+                            isFile: isFile,
+                            mode: stat.mode,
+                            size: stat.size,
+                            atime: stat.atime,
+                            mtime: stat.mtime,
+                            ctime: stat.ctime
+                        }
                     });
                     
                     if( isFile ){
@@ -145,20 +152,20 @@ function monitfs()
                 if( !bool ){
                     unregister( self.entry );
                 }
-                else if( !self.isFile ){
+                else if( self.stat.isFile ){
                     readDir( self.path );
                 }
             });
         },
-        register = function( entry, path, isFile )
+        register = function( entry, path, stat )
         {
             if( entry && !MONITOR[entry] )
             {
                 MONITOR[entry] = fs.watch( path, eventCb );
                 MONITOR[entry].entry = entry;
                 MONITOR[entry].path = path;
-                MONITOR[entry].isFile = isFile;
-                NOTIFY( 'watch', entry, path, isFile );
+                MONITOR[entry].stat = stat;
+                NOTIFY( 'watch', entry, path, stat );
             }
         },
         unregister = function( entry )
@@ -169,9 +176,9 @@ function monitfs()
                 
                 delete MONITOR[entry];
                 target.close();
-                NOTIFY( 'unwatch', entry, target.path, target.isFile );
+                NOTIFY( 'unwatch', entry, target.path, target.stat );
                 
-                if( !target.isFile ){
+                if( !target.stat.isFile ){
                     getEntries( entry ).forEach( unregister );
                 }
             }
@@ -188,7 +195,7 @@ function monitfs()
             ROOT = dir;
             NOTIFY = notify;
             // register root dir
-            register( '/', ROOT, false );
+            register( '/', ROOT, { isFile: false } );
             readDir( ROOT );
         },
         readDir = function( dir )
@@ -206,7 +213,7 @@ function monitfs()
                     {
                         var entry = item.path.replace( ROOT, '' );
                         
-                        if( item.isFile )
+                        if( item.stat.isFile )
                         {
                             if( !checkFile( item, entry ) ){
                                 return;
@@ -236,7 +243,7 @@ function monitfs()
                 return false;
             }
             // register file entry
-            register( entry, item.path, true );
+            register( entry, item.path, item.stat );
             
             return true;
         },
@@ -246,7 +253,7 @@ function monitfs()
                 return false;
             }
             // register dir entry
-            register( entry, item.path, false );
+            register( entry, item.path, item.stat );
             
             return true;
         };
