@@ -5,7 +5,7 @@
         "name": "Masatoshi Teruya",
         "url": "https://twitter.com/mah0x211"
     },
-    "version": "0.10.0",
+    "version": "0.10.1",
     "main": "./monitfs",
     "repository": {
         "type": "git",

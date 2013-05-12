@@ -11,9 +11,10 @@ function init_monitfs(){
 
 var pkg = {
         path: require('path'),
-        events: require('events')
     },
     // globals
+    util = require('util'),
+    events = require('events'),
     fs = require('fs'),
     // constants
     DEFAULT_IGNORE_FILE = [
@@ -129,8 +130,8 @@ function traverse( root, cb )
 
 function monitfs()
 {
-    var MONITOR = {},
-        EV = new pkg.events.EventEmitter(),
+    var self = this,
+        MONITOR = {},
         ROOT = undefined,
         RE_IGNORE_FILE = undefined,
         RE_IGNORE_DIR = undefined,
@@ -161,7 +162,7 @@ function monitfs()
             {
                 if( err ){
                     unregister( entry );
-                    EV.emit( 'error', err );
+                    self.emit( 'error', err );
                 }
                 else
                 {
@@ -185,7 +186,7 @@ function monitfs()
                 MONITOR[entry].entry = entry;
                 MONITOR[entry].path = path;
                 MONITOR[entry].stat = stat;
-                EV.emit( 'watch', entry, path, stat );
+                self.emit( 'watch', entry, path, stat );
             }
         },
         unregister = function( entry, silently )
@@ -197,7 +198,7 @@ function monitfs()
                 delete MONITOR[entry];
                 target.close();
                 if( !silently ){
-                    EV.emit( 'unwatch', entry, target.path, target.stat );
+                    self.emit( 'unwatch', entry, target.path, target.stat );
                 }
                 
                 if( !target.stat.isFile ){
@@ -210,7 +211,7 @@ function monitfs()
             traverse( dir, function( err, entries )
             {
                 if( err ){
-                    EV.emit( 'error', err );
+                    self.emit( 'error', err );
                 }
                 else
                 {
@@ -265,6 +266,7 @@ function monitfs()
             return true;
         };
     
+    events.EventEmitter.call( self );
     this.setIgnoreFile = function( arr ){
         RE_IGNORE_FILE = verifyIgnores( arr );
     };
@@ -280,9 +282,6 @@ function monitfs()
     this.unwatch = function(){
         Object.keys( MONITOR ).forEach( unregister );
     }; 
-    this.on = function(){
-        return EV.on.apply( EV, Array.prototype.slice.call( arguments ) );
-    };
     this.toSafePath = toSafePath;
     this.traverse = traverse;
     
@@ -291,6 +290,7 @@ function monitfs()
     RE_IGNORE_DIR = verifyIgnores( DEFAULT_IGNORE_DIR );
 }
 
+util.inherits( monitfs, events.EventEmitter );
 monitfs.toSafePath = toSafePath;
 monitfs.traverse = traverse;
 
