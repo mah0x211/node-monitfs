@@ -11,6 +11,7 @@ function init_monitfs(){
 
 var pkg = {
         path: require('path'),
+        events: require('events')
     },
     // globals
     fs = require('fs'),
@@ -129,20 +130,14 @@ function traverse( root, cb )
 function monitfs()
 {
     var MONITOR = {},
+        EV = new pkg.events.EventEmitter(),
         ROOT = undefined,
-        NOTIFY = undefined,
         RE_IGNORE_FILE = undefined,
         RE_IGNORE_DIR = undefined,
         getEntries = function( entry ){
             var re = new RegExp( '^' + ( entry === '/' ? '' : entry ) + 
                                  '/.+$', 'mg' );
             return Object.keys( MONITOR ).join('\n').match( re )||[];
-        },
-        setIgnoreFile = function( arr ){
-            RE_IGNORE_FILE = verifyIgnores( arr );
-        },
-        setIgnoreDir = function( arr ){
-            RE_IGNORE_DIR = verifyIgnores( arr );
         },
         eventCb = function( evt, name )
         {
@@ -166,7 +161,7 @@ function monitfs()
             {
                 if( err ){
                     unregister( entry );
-                    NOTIFY( 'error', err );
+                    EV.emit( 'error', err );
                 }
                 else
                 {
@@ -190,7 +185,7 @@ function monitfs()
                 MONITOR[entry].entry = entry;
                 MONITOR[entry].path = path;
                 MONITOR[entry].stat = stat;
-                NOTIFY( 'watch', entry, path, stat );
+                EV.emit( 'watch', entry, path, stat );
             }
         },
         unregister = function( entry, silently )
@@ -202,7 +197,7 @@ function monitfs()
                 delete MONITOR[entry];
                 target.close();
                 if( !silently ){
-                    NOTIFY( 'unwatch', entry, target.path, target.stat );
+                    EV.emit( 'unwatch', entry, target.path, target.stat );
                 }
                 
                 if( !target.stat.isFile ){
@@ -210,27 +205,12 @@ function monitfs()
                 }
             }
         },
-        unwatch = function(){
-            Object.keys( MONITOR ).forEach( unregister );
-        },
-        watch = function( dir, notify )
-        {
-            if( typeof notify !== 'function' ){
-                throw new TypeError( 'notify is not function' );
-            }
-            
-            ROOT = dir;
-            NOTIFY = notify;
-            // register root dir
-            register( '/', ROOT, { isFile: false } );
-            readDir( ROOT );
-        },
         readDir = function( dir )
         {
             traverse( dir, function( err, entries )
             {
                 if( err ){
-                    NOTIFY( 'error', err );
+                    EV.emit( 'error', err );
                 }
                 else
                 {
@@ -285,12 +265,26 @@ function monitfs()
             return true;
         };
     
-    this['setIgnoreFile'] = setIgnoreFile;
-    this['setIgnoreDir'] = setIgnoreDir;
-    this['watch'] = watch;
-    this['unwatch'] = unwatch; 
-    this['toSafePath'] = toSafePath;
-    this['traverse'] = traverse;
+    this.setIgnoreFile = function( arr ){
+        RE_IGNORE_FILE = verifyIgnores( arr );
+    };
+    this.setIgnoreDir = function( arr ){
+        RE_IGNORE_DIR = verifyIgnores( arr );
+    };
+    this.watch = function( dir ){
+        ROOT = dir;
+        // register root dir
+        register( '/', ROOT, { isFile: false } );
+        readDir( ROOT );
+    };
+    this.unwatch = function(){
+        Object.keys( MONITOR ).forEach( unregister );
+    }; 
+    this.on = function(){
+        return EV.on.apply( EV, Array.prototype.slice.call( arguments ) );
+    };
+    this.toSafePath = toSafePath;
+    this.traverse = traverse;
     
     // init
     RE_IGNORE_FILE = verifyIgnores( DEFAULT_IGNORE_FILE );
